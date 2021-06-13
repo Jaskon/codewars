@@ -1,39 +1,37 @@
-function getDepth(arr, i, j) {
-  const colour = arr[i][j];
-  let depth = 0;
+function calcDepths(depths) {
+  const surrounding = [];
+  let direction = [];
 
-  const queue = [[i, j]];
-  let currentDepthQueuePointer = 0;
-  let currentDepthQueuePointerEnd = 0;
+  const processCell = (depths, i, j, direction) => {
+    // Go through non-undefined values
+    if (depths[i][j] !== undefined) {
+      // Calculate depth depending on cells surroundings
+      surrounding[0] = (direction[0] === 'd' ? (depths[i - 1] && depths[i - 1][j]) : (depths[i + 1] && depths[i + 1][j])) || 0;
+      surrounding[1] = (direction[1] === 'r' ? depths[i][j - 1] : depths[i][j + 1]) || 0;
 
-  const processCell = (_i, _j) => {
-    if (!arr[_i] || arr[_i][_j] !== colour) {
-      return false;
+      const newDepth = Math.min(...surrounding) + 1;
+      depths[i][j] = ((newDepth < depths[i][j]) || !depths[i][j]) ? newDepth : depths[i][j];
     }
-    queue.push([_i, _j]);
-    return true;
   };
 
-  while (currentDepthQueuePointer < queue.length) {
-    currentDepthQueuePointerEnd = queue.length;
-    depth++;
+  direction = ['d', 'r'];
+  for (let i = 0; i < depths.length; i++) {
+    for (let j = 0; j < depths[i].length; j++) {
+      processCell(depths, i, j, direction);
+    }
+  }
 
-    while (currentDepthQueuePointer < currentDepthQueuePointerEnd) {
-      i = queue[currentDepthQueuePointer][0];
-      j = queue[currentDepthQueuePointer][1];
-
-      if (!processCell(i, j + 1)) return depth;
-      if (!processCell(i, j - 1)) return depth;
-      if (!processCell(i + 1, j)) return depth;
-      if (!processCell(i - 1, j)) return depth;
-
-      currentDepthQueuePointer++;
+  direction = ['u', 'l'];
+  for (let i = depths.length - 1; i >= 0; i--) {
+    for (let j = depths[i].length - 1; j >= 0; j--) {
+      processCell(depths, i, j, direction);
     }
   }
 }
 
+
 function central_pixels(image, colour) {
-  if (!image.pixels.find(one => one === colour)) {
+  if (image.pixels.find(one => one === colour) === undefined) {
     return [];
   }
 
@@ -41,19 +39,20 @@ function central_pixels(image, colour) {
     (_, index) => image.pixels.slice(index * image.width, (index + 1) * image.width)
   );
 
-  const depths = image.pixels.map(
-    (one, index) => one === colour ? getDepth(imageMatrix, Math.floor(index / image.width), index % image.width) : 0
+  const depths = imageMatrix.map(
+    line => line.map(
+      one => one === colour ? 0 : undefined
+    )
   );
 
-  console.log(depths);
+  calcDepths(depths);
 
-  const maxElem = Math.max(...depths);
-  const maxElemIndexes = [];
-  depths.forEach((one, index) => one === maxElem ? maxElemIndexes.push(index) : 0);
+  const depthsFlat = []
+  depths.forEach(line => depthsFlat.push(...line));
 
-  return maxElemIndexes;
+  const maxElem = depthsFlat.reduce((max, one) => one > max ? one : max, 0);
+  return depthsFlat.map((one, i) => one === maxElem ? i : null).filter(one => one !== null);
 }
-
 
 
 class Image {
@@ -71,13 +70,14 @@ describe("central_pixels", function(){
 
   const ascending = (a,b)=>a-b;  // ascending order for sorting
 
-  it("Example_In_The_Picture", function() {
-    const image = new Image([1, 1, 4, 4, 4, 4, 2, 2, 2, 2,
-      1, 1, 1, 1, 2, 2, 2, 2, 2, 2,
-      1, 1, 1, 1, 2, 2, 2, 2, 2, 2,
-      1, 1, 1, 1, 1, 3, 2, 2, 2, 2,
-      1, 1, 1, 1, 1, 3, 3, 3, 2, 2,
-      1, 1, 1, 1, 1, 1, 3, 3, 3, 3], 10, 6);
+  it("Example_In_The_Picture", function()
+  {
+    const image = new Image( [1,1,4,4,4,4,2,2,2,2,
+      1,1,1,1,2,2,2,2,2,2,
+      1,1,1,1,2,2,2,2,2,2,
+      1,1,1,1,1,3,2,2,2,2,
+      1,1,1,1,1,3,3,3,2,2,
+      1,1,1,1,1,1,3,3,3,3], 10, 6 );
 
     // Only one red pixel has the maximum depth of 3:
     const red_ctr = [ 32 ];
@@ -98,6 +98,8 @@ describe("central_pixels", function(){
     // There are no pixels with colour 5:
     const non_existent_ctr = [ ];
     expect(central_pixels(image, 5)).to.have.members(non_existent_ctr);
+
+    expect(central_pixels(new Image([1,1,0,1], 2, 2), 0)).to.have.members([2]);
   });
 
   it("Big test one", function() {
